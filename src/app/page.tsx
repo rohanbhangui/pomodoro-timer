@@ -64,7 +64,10 @@ export default function Home() {
     
     const currentMinutes = Math.floor(baseSeconds / 60);
     const currentSecondsRemainder = baseSeconds % 60;
-    const nextMinutes = currentMinutes >= 99 ? 99 : Math.min(99, currentMinutes + 5); // Lock at 99
+    
+    // Add 5, then round to nearest 5 for clean increments
+    const nextMinutesRaw = currentMinutes + 5;
+    const nextMinutes = Math.min(99, Math.round(nextMinutesRaw / 5) * 5); // Round and lock at 99
     
     setTotalSeconds(nextMinutes * 60 + currentSecondsRemainder);
     
@@ -136,9 +139,8 @@ export default function Home() {
         setTotalSeconds(0);
         setProgress(0);
         setRemainingSeconds(0);
-      } else {
-        setIsSwipingUp(true);
       }
+      // Don't set isSwipingUp yet - wait for actual movement
     }
   };
 
@@ -147,8 +149,15 @@ export default function Home() {
     
     e.preventDefault();
     
+    const currentY = e.touches[0].clientY;
+    const deltaY = touchStartY.current - currentY;
+    
+    // Only start tracking swipe after moving 15px upward
+    if (!isSwipingUp && deltaY > 15) {
+      setIsSwipingUp(true);
+    }
+    
     if (isSwipingUp) {
-      const currentY = e.touches[0].clientY;
       const containerHeight = containerRef.current?.clientHeight || window.innerHeight;
       
       // Calculate progress based on actual position (0 at bottom, 1 at top)
@@ -162,8 +171,19 @@ export default function Home() {
         progress = progress * 0.2; // Only allow 20% of normal movement
       }
       
-      setSwipeProgress(progress);
-      setIsAtTop(progress >= 0.95);
+      // If threshold reached and has time set, snap to top with wobble
+      const wasAtTop = isAtTop;
+      const reachedThreshold = progress >= 0.5 && totalSeconds > 0;
+      
+      if (reachedThreshold && !wasAtTop) {
+        setSwipeProgress(1); // Snap to top
+        setIsAtTop(true);
+        setShouldWobble(true);
+        setTimeout(() => setShouldWobble(false), 400);
+      } else if (!reachedThreshold) {
+        setSwipeProgress(progress);
+        setIsAtTop(false);
+      }
     }
   };
 
@@ -171,12 +191,17 @@ export default function Home() {
     if (touchStartY.current === null) return;
     
     if (isSwipingUp) {
-      // Only start timer if released at the top
+      // If at top (threshold was reached), start timer
       if (isAtTop && timerState === 'initial' && totalSeconds > 0) {
         startTimer();
       } else {
         // Trigger wobble if at 0:00 and tried to pull up
         if (totalSeconds === 0 && swipeProgress > 0) {
+          setShouldWobble(true);
+          setTimeout(() => setShouldWobble(false), 800);
+        }
+        // Also wobble if time is set but didn't reach threshold
+        if (totalSeconds > 0 && swipeProgress > 0 && !isAtTop) {
           setShouldWobble(true);
           setTimeout(() => setShouldWobble(false), 800);
         }
@@ -200,17 +225,23 @@ export default function Home() {
         setTotalSeconds(0);
         setProgress(0);
         setRemainingSeconds(0);
-      } else {
-        setIsSwipingUp(true);
       }
+      // Don't set isSwipingUp yet - wait for actual movement
     }
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
     if (mouseStartY.current === null) return;
     
+    const currentY = e.clientY;
+    const deltaY = mouseStartY.current - currentY;
+    
+    // Only start tracking swipe after moving 15px upward
+    if (!isSwipingUp && deltaY > 15) {
+      setIsSwipingUp(true);
+    }
+    
     if (isSwipingUp) {
-      const currentY = e.clientY;
       const containerHeight = containerRef.current?.clientHeight || window.innerHeight;
       
       // Calculate progress based on actual position (0 at bottom, 1 at top)
@@ -224,8 +255,19 @@ export default function Home() {
         progress = progress * 0.2; // Only allow 20% of normal movement
       }
       
-      setSwipeProgress(progress);
-      setIsAtTop(progress >= 0.95);
+      // If threshold reached and has time set, snap to top with wobble
+      const wasAtTop = isAtTop;
+      const reachedThreshold = progress >= 0.5 && totalSeconds > 0;
+      
+      if (reachedThreshold && !wasAtTop) {
+        setSwipeProgress(1); // Snap to top
+        setIsAtTop(true);
+        setShouldWobble(true);
+        setTimeout(() => setShouldWobble(false), 400);
+      } else if (!reachedThreshold) {
+        setSwipeProgress(progress);
+        setIsAtTop(false);
+      }
     }
   };
 
@@ -233,12 +275,17 @@ export default function Home() {
     if (mouseStartY.current === null) return;
     
     if (isSwipingUp) {
-      // Only start timer if released at the top
+      // If at top (threshold was reached), start timer
       if (isAtTop && timerState === 'initial' && totalSeconds > 0) {
         startTimer();
       } else {
         // Trigger wobble if at 0:00 and tried to pull up
         if (totalSeconds === 0 && swipeProgress > 0) {
+          setShouldWobble(true);
+          setTimeout(() => setShouldWobble(false), 800);
+        }
+        // Also wobble if time is set but didn't reach threshold
+        if (totalSeconds > 0 && swipeProgress > 0 && !isAtTop) {
           setShouldWobble(true);
           setTimeout(() => setShouldWobble(false), 800);
         }

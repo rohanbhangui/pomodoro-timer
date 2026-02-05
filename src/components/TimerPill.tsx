@@ -42,6 +42,9 @@ const TimerPill = forwardRef<HTMLDivElement, TimerPillProps>(({ time, progress, 
     } else if (target.classList.contains('seconds-click')) {
       (startPos.current as any).clickTarget = 'seconds';
     }
+    
+    // Stop propagation to prevent parent from thinking a swipe started
+    e.stopPropagation();
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
@@ -52,6 +55,8 @@ const TimerPill = forwardRef<HTMLDivElement, TimerPillProps>(({ time, progress, 
     if (deltaX > 5 || deltaY > 5) {
       setIsDragging(true);
     }
+    // Stop propagation during movement to prevent parent handling
+    e.stopPropagation();
   };
 
   const handlePointerUp = (e: React.PointerEvent) => {
@@ -61,14 +66,16 @@ const TimerPill = forwardRef<HTMLDivElement, TimerPillProps>(({ time, progress, 
     if (!isDragging) {
       const clickTarget = (startPos.current as any).clickTarget;
       if (clickTarget === 'minutes') {
-        e.stopPropagation(); // Only stop propagation for number clicks
+        e.stopPropagation();
         onEditMinutes?.(e as any);
       } else if (clickTarget === 'seconds') {
-        e.stopPropagation(); // Only stop propagation for number clicks
+        e.stopPropagation();
         onEditSeconds?.(e as any);
       }
+    } else {
+      // Only let drag events bubble for swipe handling
+      // Don't stop propagation here
     }
-    // If it was a drag, let the event bubble to parent for swipe handling
     
     startPos.current = null;
     // Delay resetting isDragging slightly to allow click events to check it
@@ -98,7 +105,7 @@ const TimerPill = forwardRef<HTMLDivElement, TimerPillProps>(({ time, progress, 
       ref={ref}
       className={`absolute ${animate ? 'transition-all duration-1000 ease-linear' : ''} ${wobble ? 'wobble-once' : ''}`}
       style={{
-        top: `${clampedProgress * 70 + 10}%`, // Start at 10%, end at 80%
+        top: `${clampedProgress * 60 + 15}%`, // Adjusted: start at 15%, end at 75% for better landscape positioning
         left: '50%',
         transform: 'translateX(-50%)',
         willChange: 'top',
