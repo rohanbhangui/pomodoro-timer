@@ -44,18 +44,22 @@ export default function Home() {
 
   // Handle time edit for minutes (0-99, increments of 5)
   const handleMinutesEdit = (e: React.MouseEvent) => {
+    // If in done state, fully reset
+    let baseSeconds = totalSeconds;
     if (timerState === 'done') {
       setTimerState('initial');
       setProgress(0);
       setRemainingSeconds(0);
+      setTotalSeconds(0);
+      baseSeconds = 0;
     }
     if (timerState !== 'initial' && timerState !== 'done') return;
     
     e.stopPropagation();
     e.preventDefault();
     
-    const currentMinutes = Math.floor(totalSeconds / 60);
-    const currentSecondsRemainder = totalSeconds % 60;
+    const currentMinutes = Math.floor(baseSeconds / 60);
+    const currentSecondsRemainder = baseSeconds % 60;
     const nextMinutes = currentMinutes >= 99 ? 99 : Math.min(99, currentMinutes + 5); // Lock at 99
     
     setTotalSeconds(nextMinutes * 60 + currentSecondsRemainder);
@@ -69,18 +73,22 @@ export default function Home() {
 
   // Handle time edit for seconds (0, 15, 30, 45)
   const handleSecondsEdit = (e: React.MouseEvent) => {
+    // If in done state, fully reset
+    let baseSeconds = totalSeconds;
     if (timerState === 'done') {
       setTimerState('initial');
       setProgress(0);
       setRemainingSeconds(0);
+      setTotalSeconds(0);
+      baseSeconds = 0;
     }
     if (timerState !== 'initial' && timerState !== 'done') return;
     
     e.stopPropagation();
     e.preventDefault();
     
-    const currentMinutes = Math.floor(totalSeconds / 60);
-    const currentSeconds = totalSeconds % 60;
+    const currentMinutes = Math.floor(baseSeconds / 60);
+    const currentSeconds = baseSeconds % 60;
     const secondsOptions = [0, 15, 30, 45];
     let currentIndex = secondsOptions.indexOf(currentSeconds);
     // If current seconds not in array, find the next higher value or start at 0
@@ -115,10 +123,18 @@ export default function Home() {
 
   // Handle touch/swipe gestures
   const handleTouchStart = (e: React.TouchEvent) => {
-    if (timerState === 'initial') {
+    if (timerState === 'initial' || timerState === 'done') {
       e.preventDefault();
       touchStartY.current = e.touches[0].clientY;
-      setIsSwipingUp(true);
+      if (timerState === 'done') {
+        // Reset to initial state when dragging on done screen
+        setTimerState('initial');
+        setTotalSeconds(0);
+        setProgress(0);
+        setRemainingSeconds(0);
+      } else {
+        setIsSwipingUp(true);
+      }
     }
   };
 
@@ -144,14 +160,6 @@ export default function Home() {
       
       setSwipeProgress(progress);
       setIsAtTop(progress >= 0.95);
-      
-      // If dragging down past starting position, reduce time
-      if (currentY > touchStartY.current && totalSeconds > 0) {
-        const dragDownDistance = currentY - touchStartY.current;
-        const secondsToReduce = Math.floor(dragDownDistance / 20) * 15;
-        const newSeconds = Math.max(0, totalSeconds - secondsToReduce);
-        setTotalSeconds(newSeconds);
-      }
     }
   };
 
@@ -180,9 +188,17 @@ export default function Home() {
 
   // Handle mouse gestures for desktop
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (timerState === 'initial') {
+    if (timerState === 'initial' || timerState === 'done') {
       mouseStartY.current = e.clientY;
-      setIsSwipingUp(true);
+      if (timerState === 'done') {
+        // Reset to initial state when dragging on done screen
+        setTimerState('initial');
+        setTotalSeconds(0);
+        setProgress(0);
+        setRemainingSeconds(0);
+      } else {
+        setIsSwipingUp(true);
+      }
     }
   };
 
@@ -206,14 +222,6 @@ export default function Home() {
       
       setSwipeProgress(progress);
       setIsAtTop(progress >= 0.95);
-      
-      // If dragging down past starting position, reduce time
-      if (currentY > mouseStartY.current && totalSeconds > 0) {
-        const dragDownDistance = currentY - mouseStartY.current;
-        const secondsToReduce = Math.floor(dragDownDistance / 20) * 15;
-        const newSeconds = Math.max(0, totalSeconds - secondsToReduce);
-        setTotalSeconds(newSeconds);
-      }
     }
   };
 
@@ -270,12 +278,11 @@ export default function Home() {
           }
           
           if (newRemaining <= 0) {
-            // Smoothly transition to done state by first setting progress to 1
             setProgress(1);
-            // Delay state change slightly to allow smooth animation
+            // Wait for the 1-second animation to complete before showing done state
             setTimeout(() => {
               setTimerState('done');
-            }, 300);
+            }, 1000);
             return 0;
           }
           
@@ -442,7 +449,7 @@ export default function Home() {
           <TimerPill 
             time="0:00" 
             progress={1} 
-            animate={true}
+            animate={false}
             editable={true}
             onEditMinutes={handleMinutesEdit}
             onEditSeconds={handleSecondsEdit} 
