@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import TimerPill from '@/components/TimerPill';
-import TimeDisplay from '@/components/TimeDisplay';
-import SwipeIndicator from '@/components/SwipeIndicator';
+import { TIMER_INCREMENTS, SWIPE_GESTURE } from '@/constants/timer';
 
 type TimerState = 'initial' | 'running' | 'mid' | 'paused' | 'done';
 
@@ -28,6 +27,10 @@ export default function Home() {
   const animationFrameRef = useRef<number | null>(null);
   const progressRef = useRef<number>(0); // Track progress without causing re-renders
   const pillRef = useRef<HTMLDivElement>(null); // Direct reference to pill for CSS updates
+  const swipeProgressRef = useRef<number>(0); // Track swipe progress without causing re-renders
+  const initialPillWrapperRef = useRef<HTMLDivElement>(null); // Reference to initial state pill wrapper
+  const runningPillWrapperRef = useRef<HTMLDivElement>(null); // Reference to running state pill wrapper
+  const [containerHeight, setContainerHeight] = useState(0); // Track actual container height
 
   // Detect if we're on mobile viewport
   useEffect(() => {
@@ -37,6 +40,26 @@ export default function Home() {
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Measure container height for travel calculations
+  useEffect(() => {
+    const measureContainer = () => {
+      if (containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        const isMobileView = window.innerWidth < 768;
+        // Account for container padding: py-12 (48px each) on mobile, py-16 (64px each) on desktop
+        const paddingTop = isMobileView ? 48 : 64;
+        const paddingBottom = isMobileView ? 48 : 64;
+        const pillOffset = 48; // 3rem - same offset from top and bottom for symmetry
+        // Calculate travel distance: total height minus padding and offsets on both sides
+        const travelDistance = rect.height - paddingTop - paddingBottom - (pillOffset * 2);
+        setContainerHeight(travelDistance);
+      }
+    };
+    measureContainer();
+    window.addEventListener('resize', measureContainer);
+    return () => window.removeEventListener('resize', measureContainer);
   }, []);
 
   // Format time as M:SS
@@ -65,9 +88,9 @@ export default function Home() {
     const currentMinutes = Math.floor(baseSeconds / 60);
     const currentSecondsRemainder = baseSeconds % 60;
     
-    // Add 5, then round to nearest 5 for clean increments
-    const nextMinutesRaw = currentMinutes + 5;
-    const nextMinutes = Math.min(99, Math.round(nextMinutesRaw / 5) * 5); // Round and lock at 99
+    // Add minutes increment, then round to nearest increment for clean increments
+    const nextMinutesRaw = currentMinutes + TIMER_INCREMENTS.MINUTES_INCREMENT;
+    const nextMinutes = Math.min(99, Math.round(nextMinutesRaw / TIMER_INCREMENTS.MINUTES_INCREMENT) * TIMER_INCREMENTS.MINUTES_INCREMENT); // Round and lock at 99
     
     setTotalSeconds(nextMinutes * 60 + currentSecondsRemainder);
     
@@ -96,8 +119,8 @@ export default function Home() {
     
     const currentMinutes = Math.floor(baseSeconds / 60);
     const currentSeconds = baseSeconds % 60;
-    const secondsOptions = [0, 15, 30, 45];
-    let currentIndex = secondsOptions.indexOf(currentSeconds);
+    const secondsOptions = TIMER_INCREMENTS.SECONDS_OPTIONS;
+    let currentIndex = secondsOptions.indexOf(currentSeconds as 0 | 15 | 30 | 45);
     // If current seconds not in array, find the next higher value or start at 0
     if (currentIndex === -1) {
       currentIndex = secondsOptions.findIndex(s => s > currentSeconds);
@@ -139,6 +162,7 @@ export default function Home() {
         setTotalSeconds(0);
         setProgress(0);
         setRemainingSeconds(0);
+        setDoneFadedToGrey(false);
       }
       // Don't set isSwipingUp yet - wait for actual movement
     }
@@ -152,19 +176,20 @@ export default function Home() {
     const currentY = e.touches[0].clientY;
     const deltaY = touchStartY.current - currentY;
     
-    // Only start tracking swipe after moving 15px upward
-    if (!isSwipingUp && deltaY > 15) {
+    // Only start tracking swipe after moving threshold pixels upward
+    if (!isSwipingUp && deltaY > SWIPE_GESTURE.MOVEMENT_THRESHOLD) {
       setIsSwipingUp(true);
     }
     
     if (isSwipingUp) {
-      const containerHeight = containerRef.current?.clientHeight || window.innerHeight;
+      const container = containerRef.current;
+      if (!container) return;
       
-      // Calculate progress based on actual position (0 at bottom, 1 at top)
-      const bottomPosition = containerHeight * 0.8;
-      const topPosition = containerHeight * 0.1;
-      const range = bottomPosition - topPosition;
-      let progress = Math.max(0, Math.min(1, (bottomPosition - currentY) / range));
+      const rect = container.getBoundingClientRect();
+      const relativeY = currentY - rect.top;
+      
+      // Simple progress calculation from bottom (0) to top (1)
+      let progress = Math.max(0, Math.min(1, 1 - (relativeY / rect.height)));
       
       // Add resistance if timer is at 0:00 - reduce progress dramatically
       if (totalSeconds === 0) {
@@ -173,21 +198,23 @@ export default function Home() {
       
       // If threshold reached and has time set, snap to top with wobble
       const wasAtTop = isAtTop;
-      const reachedThreshold = progress >= 0.5 && totalSeconds > 0;
+      const reachedThreshold = progress >= SWIPE_GESTURE.SNAP_THRESHOLD && totalSeconds > 0;
       
       if (reachedThreshold && !wasAtTop) {
-        setSwipeProgress(1); // Snap to top
+        swipeProgressRef.current = 1;
+        setSwipeProgress(1); // Snap to top - sync state
         setIsAtTop(true);
         setShouldWobble(true);
         setTimeout(() => setShouldWobble(false), 400);
       } else if (!reachedThreshold) {
-        setSwipeProgress(progress);
+        swipeProgressRef.current = progress;
+        setSwipeProgress(progress); // Update state to match ref
         setIsAtTop(false);
       }
     }
   };
 
-  const handleTouchEnd = (e: React.TouchEvent) => {
+  const handleTouchEnd = () => {
     if (touchStartY.current === null) return;
     
     if (isSwipingUp) {
@@ -196,16 +223,17 @@ export default function Home() {
         startTimer();
       } else {
         // Trigger wobble if at 0:00 and tried to pull up
-        if (totalSeconds === 0 && swipeProgress > 0) {
+        if (totalSeconds === 0 && swipeProgressRef.current > 0) {
           setShouldWobble(true);
           setTimeout(() => setShouldWobble(false), 800);
         }
         // Also wobble if time is set but didn't reach threshold
-        if (totalSeconds > 0 && swipeProgress > 0 && !isAtTop) {
+        if (totalSeconds > 0 && swipeProgressRef.current > 0 && !isAtTop) {
           setShouldWobble(true);
           setTimeout(() => setShouldWobble(false), 800);
         }
-        // Reset swipe if not at top
+        // Reset swipe if not at top - sync state
+        swipeProgressRef.current = 0;
         setSwipeProgress(0);
         setIsSwipingUp(false);
         setIsAtTop(false);
@@ -225,6 +253,7 @@ export default function Home() {
         setTotalSeconds(0);
         setProgress(0);
         setRemainingSeconds(0);
+        setDoneFadedToGrey(false);
       }
       // Don't set isSwipingUp yet - wait for actual movement
     }
@@ -236,19 +265,20 @@ export default function Home() {
     const currentY = e.clientY;
     const deltaY = mouseStartY.current - currentY;
     
-    // Only start tracking swipe after moving 15px upward
-    if (!isSwipingUp && deltaY > 15) {
+    // Only start tracking swipe after moving threshold pixels upward
+    if (!isSwipingUp && deltaY > SWIPE_GESTURE.MOVEMENT_THRESHOLD) {
       setIsSwipingUp(true);
     }
     
     if (isSwipingUp) {
-      const containerHeight = containerRef.current?.clientHeight || window.innerHeight;
+      const container = containerRef.current;
+      if (!container) return;
       
-      // Calculate progress based on actual position (0 at bottom, 1 at top)
-      const bottomPosition = containerHeight * 0.8;
-      const topPosition = containerHeight * 0.1;
-      const range = bottomPosition - topPosition;
-      let progress = Math.max(0, Math.min(1, (bottomPosition - currentY) / range));
+      const rect = container.getBoundingClientRect();
+      const relativeY = currentY - rect.top;
+      
+      // Simple progress calculation from bottom (0) to top (1)
+      let progress = Math.max(0, Math.min(1, 1 - (relativeY / rect.height)));
       
       // Add resistance if timer is at 0:00 - reduce progress dramatically
       if (totalSeconds === 0) {
@@ -257,21 +287,23 @@ export default function Home() {
       
       // If threshold reached and has time set, snap to top with wobble
       const wasAtTop = isAtTop;
-      const reachedThreshold = progress >= 0.5 && totalSeconds > 0;
+      const reachedThreshold = progress >= SWIPE_GESTURE.SNAP_THRESHOLD && totalSeconds > 0;
       
       if (reachedThreshold && !wasAtTop) {
-        setSwipeProgress(1); // Snap to top
+        swipeProgressRef.current = 1;
+        setSwipeProgress(1); // Snap to top - sync state
         setIsAtTop(true);
         setShouldWobble(true);
         setTimeout(() => setShouldWobble(false), 400);
       } else if (!reachedThreshold) {
-        setSwipeProgress(progress);
+        swipeProgressRef.current = progress;
+        setSwipeProgress(progress); // Update state to match ref
         setIsAtTop(false);
       }
     }
   };
 
-  const handleMouseUp = (e: React.MouseEvent) => {
+  const handleMouseUp = () => {
     if (mouseStartY.current === null) return;
     
     if (isSwipingUp) {
@@ -280,16 +312,17 @@ export default function Home() {
         startTimer();
       } else {
         // Trigger wobble if at 0:00 and tried to pull up
-        if (totalSeconds === 0 && swipeProgress > 0) {
+        if (totalSeconds === 0 && swipeProgressRef.current > 0) {
           setShouldWobble(true);
           setTimeout(() => setShouldWobble(false), 800);
         }
         // Also wobble if time is set but didn't reach threshold
-        if (totalSeconds > 0 && swipeProgress > 0 && !isAtTop) {
+        if (totalSeconds > 0 && swipeProgressRef.current > 0 && !isAtTop) {
           setShouldWobble(true);
           setTimeout(() => setShouldWobble(false), 800);
         }
-        // Reset swipe if not at top
+        // Reset swipe if not at top - sync state
+        swipeProgressRef.current = 0;
         setSwipeProgress(0);
         setIsSwipingUp(false);
         setIsAtTop(false);
@@ -329,16 +362,14 @@ export default function Home() {
         
         progressRef.current = newProgress;
         
-        // Update pill position via CSS transform (no React re-render)
-        if (pillRef.current) {
-          const yPosition = newProgress * 60 + 15;
-          pillRef.current.style.top = `${yPosition}%`;
+        // Update wrapper position via CSS transform (no React re-render)
+        if (runningPillWrapperRef.current && containerHeight > 0) {
+          runningPillWrapperRef.current.style.transform = `translate(-50%, ${-containerHeight + (newProgress * containerHeight)}px)`;
         }
         
-        // Only update state every 100ms to reduce re-renders
+        // Only update state every 500ms to reduce re-renders (just for time display)
         const now = Date.now();
-        if (now - lastStateUpdate > 100) {
-          setProgress(newProgress);
+        if (now - lastStateUpdate > 500) {
           setRemainingSeconds(Math.ceil(newRemaining));
           lastStateUpdate = now;
         }
@@ -353,6 +384,7 @@ export default function Home() {
           animationFrameRef.current = requestAnimationFrame(updateProgress);
         } else {
           setProgress(1);
+          setRemainingSeconds(0);
           setTimerState('done');
         }
       };
@@ -370,52 +402,11 @@ export default function Home() {
         cancelAnimationFrame(animationFrameRef.current);
       }
     }
-  }, [timerState, totalSeconds]);
-
-  // Old interval-based timer - keep for state transitions
-  useEffect(() => {
-    if ((timerState === 'running' || timerState === 'mid') && remainingSeconds > 0) {
-      timerRef.current = setInterval(() => {
-        setRemainingSeconds((prev) => {
-          const newRemaining = prev - 1;
-          const newProgress = 1 - newRemaining / totalSeconds;
-          setProgress(newProgress);
-          
-          // Check if we're in the middle section (around 50%)
-          if (newProgress >= 0.4 && newProgress < 0.6 && timerState === 'running') {
-            setTimerState('mid');
-          }
-          
-          if (newRemaining <= 0) {
-            setProgress(1);
-            // Wait for the 1-second animation to complete before showing done state
-            setTimeout(() => {
-              setTimerState('done');
-            }, 1000);
-            return 0;
-          }
-          
-          return newRemaining;
-        });
-      }, 1000);
-
-      return () => {
-        if (timerRef.current) {
-          clearInterval(timerRef.current);
-        }
-      };
-    } else if (timerState === 'paused') {
-      // Clear interval when paused
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-    }
-  }, [timerState, remainingSeconds, totalSeconds]);
+  }, [timerState, totalSeconds, containerHeight]);
 
   // Fade to grey after 10 seconds in done state
   useEffect(() => {
     if (timerState === 'done') {
-      setDoneFadedToGrey(false);
       doneTimeoutRef.current = setTimeout(() => {
         setDoneFadedToGrey(true);
       }, 10000);
@@ -426,7 +417,6 @@ export default function Home() {
         }
       };
     } else {
-      setDoneFadedToGrey(false);
       if (doneTimeoutRef.current) {
         clearTimeout(doneTimeoutRef.current);
       }
@@ -499,10 +489,10 @@ export default function Home() {
   };
 
   return (
-    <div className="flex min-h-screen w-full items-center justify-center bg-zinc-900 md:bg-transparent px-6 py-6 md:p-0" style={{ touchAction: 'none' }}>
+    <div className="flex h-screen w-full items-center justify-center bg-zinc-900 md:bg-transparent p-6 md:p-0" style={{ touchAction: 'none' }}>
       <div
         ref={containerRef}
-        className={`relative flex w-full md:w-full h-[calc(100vh-3rem)] md:h-screen max-w-md md:max-w-none flex-col items-center justify-between transition-colors duration-500 ${getBackgroundColor()} overflow-hidden md:rounded-none rounded-[60px] shadow-2xl select-none py-8 md:py-0 ${
+        className={`relative flex w-full md:w-full h-full md:h-screen max-w-md md:max-w-none flex-col items-center justify-between transition-colors duration-500 ${getBackgroundColor()} overflow-hidden md:rounded-none rounded-[60px] shadow-2xl select-none py-12 md:py-16 ${
           isSwipingUp ? 'cursor-grabbing' : ''
         }`}
         style={{ touchAction: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
@@ -517,11 +507,11 @@ export default function Home() {
       {/* Timer Pill - show in all states */}
       {timerState === 'initial' ? (
         <div 
-          className="absolute"
+          ref={initialPillWrapperRef}
+          className="absolute left-1/2"
           style={{
-            top: `${(1 - swipeProgress) * 60 + 15}%`,
-            left: '50%',
-            transform: 'translateX(-50%)',
+            bottom: '3rem', // 48px offset from bottom - prevents touching edge
+            transform: `translate(-50%, ${containerHeight > 0 ? -swipeProgress * containerHeight : 0}px)`,
           }}
         >
           {/* Swipe indicator above pill */}
@@ -569,7 +559,7 @@ export default function Home() {
               style={{
                 left: '100%',
                 top: '50%',
-                transform: 'translate(20px, -50%)',
+                transform: isMobile ? 'translate(16px, -50%)' : 'translate(20px, -50%)',
               }}
             >
               <svg
@@ -600,12 +590,8 @@ export default function Home() {
           </div>
           {/* Timer pill stays at bottom showing 0:00 */}
           <div 
-            className="absolute"
-            style={{
-              top: '75%',
-              left: '50%',
-              transform: 'translateX(-50%)',
-            }}
+            className="absolute left-1/2 -translate-x-1/2"
+            style={{ bottom: '3rem' }}
           >
             <TimerPill 
               time="0:00" 
@@ -618,7 +604,14 @@ export default function Home() {
           </div>
         </>
       ) : (
-        <>
+        <div 
+          ref={runningPillWrapperRef}
+          className="absolute left-1/2"
+          style={{
+            bottom: '3rem', // 48px offset from bottom to match initial state
+            transform: `translate(-50%, ${containerHeight > 0 ? -containerHeight + (progress * containerHeight) : 0}px)`,
+          }}
+        >
           <TimerPill 
             ref={pillRef}
             time={formatTime(remainingSeconds)} 
@@ -636,9 +629,9 @@ export default function Home() {
               onTouchStart={(e) => e.stopPropagation()}
               className="absolute hover:opacity-80 active:scale-95 transition-all animate-pulse z-10 cursor-pointer"
               style={{
-                top: `${progress * 60 + 15}%`,
-                left: isMobile ? 'calc(50% + 130px)' : 'calc(50% + 100px)',
-                transform: isMobile ? 'translateY(28px)' : 'translateY(22px)',
+                left: '100%',
+                top: '50%',
+                transform: isMobile ? 'translate(16px, -50%)' : 'translate(20px, -50%)',
               }}
             >
               <svg
@@ -658,7 +651,7 @@ export default function Home() {
               </svg>
             </button>
           )}
-        </>
+        </div>
       )}
 
       {/* Swipe/Release Indicator */}
