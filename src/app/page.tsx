@@ -599,14 +599,23 @@ export default function Home() {
             <div className="text-white text-2xl font-medium animate-[fadeIn_0.5s_ease-in]">Done</div>
           </div>
           {/* Timer pill stays at bottom showing 0:00 */}
-          <TimerPill 
-            time="0:00" 
-            progress={1} 
-            animate={false}
-            editable={true}
-            onEditMinutes={handleMinutesEdit}
-            onEditSeconds={handleSecondsEdit} 
-          />
+          <div 
+            className="absolute"
+            style={{
+              top: '75%',
+              left: '50%',
+              transform: 'translateX(-50%)',
+            }}
+          >
+            <TimerPill 
+              time="0:00" 
+              progress={0} 
+              animate={false}
+              editable={true}
+              onEditMinutes={handleMinutesEdit}
+              onEditSeconds={handleSecondsEdit} 
+            />
+          </div>
         </>
       ) : (
         <>
