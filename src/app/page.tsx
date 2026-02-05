@@ -331,7 +331,7 @@ export default function Home() {
         
         // Update pill position via CSS transform (no React re-render)
         if (pillRef.current) {
-          const yPosition = newProgress * 70 + 10;
+          const yPosition = newProgress * 60 + 15;
           pillRef.current.style.top = `${yPosition}%`;
         }
         
@@ -516,16 +516,46 @@ export default function Home() {
       >
       {/* Timer Pill - show in all states */}
       {timerState === 'initial' ? (
-        <>
+        <div 
+          className="absolute"
+          style={{
+            top: `${(1 - swipeProgress) * 60 + 15}%`,
+            left: '50%',
+            transform: 'translateX(-50%)',
+          }}
+        >
+          {/* Swipe indicator above pill */}
+          {totalSeconds > 0 && !isSwipingUp && (
+            <div className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 animate-bounce" style={{ bottom: 'calc(100% + 40px)' }}>
+              <div className="text-sm font-medium opacity-60 text-center leading-tight w-15">
+                Swipe up<br />to start
+              </div>
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="opacity-60"
+              >
+                <polyline points="18 15 12 9 6 15"></polyline>
+              </svg>
+            </div>
+          )}
+          
           <TimerPill 
             time={formatTime(totalSeconds)} 
-            progress={1 - swipeProgress}
+            progress={0}
             editable={!isSwipingUp}
             onEditMinutes={handleMinutesEdit}
             onEditSeconds={handleSecondsEdit}
             animate={false}
             wobble={shouldWobble}
           />
+          
           {/* Reset icon next to pill */}
           {totalSeconds > 0 && !isSwipingUp && (
             <button
@@ -537,9 +567,9 @@ export default function Home() {
               onTouchStart={(e) => e.stopPropagation()}
               className="absolute hover:opacity-80 active:scale-95 transition-all z-10 cursor-pointer"
               style={{
-                top: `${(1 - swipeProgress) * 70 + 10}%`,
-                left: isMobile ? 'calc(50% + 130px)' : 'calc(50% + 100px)',
-                transform: isMobile ? 'translateY(30px)' : 'translateY(24px)',
+                left: '100%',
+                top: '50%',
+                transform: 'translate(20px, -50%)',
               }}
             >
               <svg
@@ -559,7 +589,7 @@ export default function Home() {
               </svg>
             </button>
           )}
-        </>
+        </div>
       ) : timerState === 'done' ? (
         <>
           {/* Done text at top - fade in smoothly */}
@@ -597,7 +627,7 @@ export default function Home() {
               onTouchStart={(e) => e.stopPropagation()}
               className="absolute hover:opacity-80 active:scale-95 transition-all animate-pulse z-10 cursor-pointer"
               style={{
-                top: `${progress * 70 + 10}%`,
+                top: `${progress * 60 + 15}%`,
                 left: isMobile ? 'calc(50% + 130px)' : 'calc(50% + 100px)',
                 transform: isMobile ? 'translateY(28px)' : 'translateY(22px)',
               }}
@@ -641,9 +671,7 @@ export default function Home() {
               <polyline points="18 15 12 9 6 15"></polyline>
             </svg>
           </div>
-        ) : (
-          <SwipeIndicator show={timerState === 'initial' && totalSeconds > 0 && !isSwipingUp} />
-        )}
+        ) : null}
       </div>
       </div>
     </div>

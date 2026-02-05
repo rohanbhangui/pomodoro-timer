@@ -103,11 +103,8 @@ const TimerPill = forwardRef<HTMLDivElement, TimerPillProps>(({ time, progress, 
   return (
     <div
       ref={ref}
-      className={`absolute ${animate ? 'transition-all duration-1000 ease-linear' : ''} ${wobble ? 'wobble-once' : ''}`}
+      className={`relative ${animate ? 'transition-all duration-1000 ease-linear' : ''} ${wobble ? 'wobble-once' : ''}`}
       style={{
-        top: `${clampedProgress * 60 + 15}%`, // Adjusted: start at 15%, end at 75% for better landscape positioning
-        left: '50%',
-        transform: 'translateX(-50%)',
         willChange: 'top',
       }}
     >

@@ -1,12 +1,19 @@
 interface SwipeIndicatorProps {
   show: boolean;
+  pillProgress: number; // 0 to 1, same as pill's progress value
 }
 
-export default function SwipeIndicator({ show }: SwipeIndicatorProps) {
+export default function SwipeIndicator({ show, pillProgress }: SwipeIndicatorProps) {
   if (!show) return null;
 
+  // Position above the pill - pill is at (1 - pillProgress) * 60 + 15
+  const pillTop = (1 - pillProgress) * 60 + 15;
+
   return (
-    <div className="absolute bottom-32 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 animate-bounce">
+    <div 
+      className="absolute left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 animate-bounce"
+      style={{ top: `calc(${pillTop}% - 120px)` }}
+    >
       <div className="text-sm font-medium opacity-60 text-center leading-tight w-15">
         Swipe up<br />to start
       </div>
