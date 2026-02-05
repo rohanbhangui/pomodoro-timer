@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, forwardRef } from 'react';
 
 interface TimerPillProps {
   time: string;
@@ -12,7 +12,7 @@ interface TimerPillProps {
   wobble?: boolean; // Whether to apply wobble animation
 }
 
-export default function TimerPill({ time, progress, editable, onEditMinutes, onEditSeconds, animate = true, wobble = false }: TimerPillProps) {
+const TimerPill = forwardRef<HTMLDivElement, TimerPillProps>(({ time, progress, editable, onEditMinutes, onEditSeconds, animate = true, wobble = false }, ref) => {
   const [minutes, seconds] = time.split(':');
   const [fontSize, setFontSize] = useState('1.875rem');
   const [isDragging, setIsDragging] = useState(false);
@@ -95,11 +95,13 @@ export default function TimerPill({ time, progress, editable, onEditMinutes, onE
   
   return (
     <div
+      ref={ref}
       className={`absolute ${animate ? 'transition-all duration-1000 ease-linear' : ''} ${wobble ? 'wobble-once' : ''}`}
       style={{
         top: `${clampedProgress * 70 + 10}%`, // Start at 10%, end at 80%
         left: '50%',
         transform: 'translateX(-50%)',
+        willChange: 'top',
       }}
     >
       <div 
@@ -134,4 +136,8 @@ export default function TimerPill({ time, progress, editable, onEditMinutes, onE
       </div>
     </div>
   );
-}
+});
+
+TimerPill.displayName = 'TimerPill';
+
+export default TimerPill;

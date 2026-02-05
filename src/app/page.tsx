@@ -24,6 +24,10 @@ export default function Home() {
   const containerRef = useRef<HTMLDivElement>(null);
   const justStartedTimer = useRef(false); // Track if we just started the timer to prevent immediate pause
   const [isMobile, setIsMobile] = useState(false);
+  const startTimeRef = useRef<number | null>(null); // Track millisecond start time
+  const animationFrameRef = useRef<number | null>(null);
+  const progressRef = useRef<number>(0); // Track progress without causing re-renders
+  const pillRef = useRef<HTMLDivElement>(null); // Direct reference to pill for CSS updates
 
   // Detect if we're on mobile viewport
   useEffect(() => {
@@ -256,6 +260,7 @@ export default function Home() {
     setSwipeProgress(0);
     setIsSwipingUp(false);
     setIsAtTop(false);
+    startTimeRef.current = Date.now();
     justStartedTimer.current = true;
     // Reset the flag after a short delay to allow normal pause/resume
     setTimeout(() => {
@@ -263,7 +268,64 @@ export default function Home() {
     }, 100);
   };
 
-  // Timer countdown effect
+  // Millisecond-precision progress updates with reduced re-renders
+  useEffect(() => {
+    if ((timerState === 'running' || timerState === 'mid') && startTimeRef.current) {
+      let lastStateUpdate = 0;
+      let hasSwitchedToMid = timerState === 'mid';
+      
+      const updateProgress = () => {
+        const elapsed = Date.now() - startTimeRef.current!;
+        const elapsedSeconds = elapsed / 1000;
+        const newRemaining = Math.max(0, totalSeconds - elapsedSeconds);
+        const newProgress = Math.min(1, elapsedSeconds / totalSeconds);
+        
+        progressRef.current = newProgress;
+        
+        // Update pill position via CSS transform (no React re-render)
+        if (pillRef.current) {
+          const yPosition = newProgress * 70 + 10;
+          pillRef.current.style.top = `${yPosition}%`;
+        }
+        
+        // Only update state every 100ms to reduce re-renders
+        const now = Date.now();
+        if (now - lastStateUpdate > 100) {
+          setProgress(newProgress);
+          setRemainingSeconds(Math.ceil(newRemaining));
+          lastStateUpdate = now;
+        }
+        
+        // Check if we're in the middle section (around 50%)
+        if (newProgress >= 0.4 && newProgress < 0.6 && !hasSwitchedToMid) {
+          setTimerState('mid');
+          hasSwitchedToMid = true;
+        }
+        
+        if (newRemaining > 0) {
+          animationFrameRef.current = requestAnimationFrame(updateProgress);
+        } else {
+          setProgress(1);
+          setTimerState('done');
+        }
+      };
+      
+      animationFrameRef.current = requestAnimationFrame(updateProgress);
+      
+      return () => {
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+        }
+      };
+    } else {
+      startTimeRef.current = null;
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    }
+  }, [timerState, totalSeconds]);
+
+  // Old interval-based timer - keep for state transitions
   useEffect(() => {
     if ((timerState === 'running' || timerState === 'mid') && remainingSeconds > 0) {
       timerRef.current = setInterval(() => {
@@ -363,10 +425,24 @@ export default function Home() {
     if (justStartedTimer.current) return;
     
     if (timerState === 'running' || timerState === 'mid') {
+      // Capture exact progress when pausing
+      if (startTimeRef.current) {
+        const elapsed = Date.now() - startTimeRef.current;
+        const elapsedSeconds = elapsed / 1000;
+        const exactProgress = Math.min(1, elapsedSeconds / totalSeconds);
+        const exactRemaining = Math.max(0, totalSeconds - elapsedSeconds);
+        setProgress(exactProgress);
+        setRemainingSeconds(Math.ceil(exactRemaining));
+      }
       setTimerState('paused');
     } else if (timerState === 'paused') {
+      // Resume from exact position - adjust startTime to continue from current progress
+      // Calculate what the start time should have been to reach current progress
+      const elapsedSoFar = progress * totalSeconds;
+      startTimeRef.current = Date.now() - (elapsedSoFar * 1000);
+      
       // Resume to the appropriate state based on progress
-      const currentProgress = 1 - remainingSeconds / totalSeconds;
+      const currentProgress = progress;
       if (currentProgress >= 0.4 && currentProgress < 0.6) {
         setTimerState('mid');
       } else {
@@ -458,9 +534,10 @@ export default function Home() {
       ) : (
         <>
           <TimerPill 
+            ref={pillRef}
             time={formatTime(remainingSeconds)} 
             progress={progress} 
-            animate={timerState !== 'paused'} 
+            animate={false}
           />
           {/* Reset icon when paused */}
           {timerState === 'paused' && (
@@ -474,7 +551,7 @@ export default function Home() {
               className="absolute hover:opacity-80 active:scale-95 transition-all animate-pulse z-10 cursor-pointer"
               style={{
                 top: `${progress * 70 + 10}%`,
-                left: isMobile ? 'calc(50% + 130px)' : 'calc(50% + 120px)',
+                left: isMobile ? 'calc(50% + 130px)' : 'calc(50% + 100px)',
                 transform: isMobile ? 'translateY(28px)' : 'translateY(22px)',
               }}
             >
