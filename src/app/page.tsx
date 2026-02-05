@@ -116,6 +116,7 @@ export default function Home() {
   // Handle touch/swipe gestures
   const handleTouchStart = (e: React.TouchEvent) => {
     if (timerState === 'initial') {
+      e.preventDefault();
       touchStartY.current = e.touches[0].clientY;
       setIsSwipingUp(true);
     }
@@ -123,6 +124,8 @@ export default function Home() {
 
   const handleTouchMove = (e: React.TouchEvent) => {
     if (touchStartY.current === null) return;
+    
+    e.preventDefault();
     
     if (isSwipingUp) {
       const currentY = e.touches[0].clientY;
@@ -366,12 +369,13 @@ export default function Home() {
   };
 
   return (
-    <div className="flex min-h-screen w-full items-center justify-center bg-zinc-900 md:bg-transparent px-6 py-6 md:p-0">
+    <div className="flex min-h-screen w-full items-center justify-center bg-zinc-900 md:bg-transparent px-6 py-6 md:p-0" style={{ touchAction: 'none' }}>
       <div
         ref={containerRef}
         className={`relative flex w-full md:w-full h-[calc(100vh-3rem)] md:h-screen max-w-md md:max-w-none flex-col items-center justify-between transition-colors duration-500 ${getBackgroundColor()} overflow-hidden md:rounded-none rounded-[60px] shadow-2xl select-none py-8 md:py-0 ${
           isSwipingUp ? 'cursor-grabbing' : ''
         }`}
+        style={{ touchAction: 'none', WebkitUserSelect: 'none', userSelect: 'none' }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}

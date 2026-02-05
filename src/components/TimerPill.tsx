@@ -23,11 +23,12 @@ export default function TimerPill({ time, progress, editable, onEditMinutes, onE
         transform: 'translateX(-50%)',
       }}
     >
-      <div className="bg-black rounded-full px-8 py-4 min-w-[200px] md:min-w-[140px] flex items-center justify-center gap-0">
+      <div className="bg-black rounded-full px-8 py-4 min-w-[200px] md:min-w-[140px] flex items-center justify-center gap-0" style={{ WebkitTextSizeAdjust: 'none', textSizeAdjust: 'none' }}>
         {editable ? (
           <>
             <span 
               className="text-white text-5xl md:text-3xl font-medium tracking-tight cursor-pointer select-none hover:opacity-80 active:scale-95 transition-all"
+              style={{ WebkitTextSizeAdjust: 'none', textSizeAdjust: 'none', fontSize: window.innerWidth < 768 ? '3rem' : '1.875rem' }}
               onClick={(e) => {
                 e.stopPropagation();
                 e.preventDefault();
@@ -38,9 +39,10 @@ export default function TimerPill({ time, progress, editable, onEditMinutes, onE
             >
               {minutes}
             </span>
-            <span className="text-white text-5xl md:text-3xl font-medium tracking-tight">:</span>
+            <span className="text-white text-5xl md:text-3xl font-medium tracking-tight" style={{ WebkitTextSizeAdjust: 'none', textSizeAdjust: 'none', fontSize: window.innerWidth < 768 ? '3rem' : '1.875rem' }}>:</span>
             <span 
               className="text-white text-5xl md:text-3xl font-medium tracking-tight cursor-pointer select-none hover:opacity-80 active:scale-95 transition-all"
+              style={{ WebkitTextSizeAdjust: 'none', textSizeAdjust: 'none', fontSize: window.innerWidth < 768 ? '3rem' : '1.875rem' }}
               onClick={(e) => {
                 e.stopPropagation();
                 e.preventDefault();
@@ -53,7 +55,7 @@ export default function TimerPill({ time, progress, editable, onEditMinutes, onE
             </span>
           </>
         ) : (
-          <span className="text-white text-3xl font-medium tracking-tight">
+          <span className="text-white text-5xl md:text-3xl font-medium tracking-tight" style={{ WebkitTextSizeAdjust: 'none', textSizeAdjust: 'none', fontSize: window.innerWidth < 768 ? '3rem' : '1.875rem' }}>
             {time}
           </span>
         )}
