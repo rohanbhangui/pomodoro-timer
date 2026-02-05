@@ -1,3 +1,7 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+
 interface TimerPillProps {
   time: string;
   progress: number; // 0 to 1, representing position from top to bottom
@@ -10,9 +14,20 @@ interface TimerPillProps {
 
 export default function TimerPill({ time, progress, editable, onEditMinutes, onEditSeconds, animate = true, wobble = false }: TimerPillProps) {
   const [minutes, seconds] = time.split(':');
+  const [fontSize, setFontSize] = useState('1.875rem');
   
   // Clamp progress between 0 and 1, allow negative for visual feedback
   const clampedProgress = Math.max(-0.1, Math.min(1, progress));
+  
+  // Set font size based on viewport
+  useEffect(() => {
+    const updateFontSize = () => {
+      setFontSize(window.innerWidth < 768 ? '3rem' : '1.875rem');
+    };
+    updateFontSize();
+    window.addEventListener('resize', updateFontSize);
+    return () => window.removeEventListener('resize', updateFontSize);
+  }, []);
   
   return (
     <div
@@ -28,7 +43,7 @@ export default function TimerPill({ time, progress, editable, onEditMinutes, onE
           <>
             <span 
               className="text-white text-5xl md:text-3xl font-medium tracking-tight cursor-pointer select-none hover:opacity-80 active:scale-95 transition-all"
-              style={{ WebkitTextSizeAdjust: 'none', textSizeAdjust: 'none', fontSize: window.innerWidth < 768 ? '3rem' : '1.875rem' }}
+              style={{ WebkitTextSizeAdjust: 'none', textSizeAdjust: 'none', fontSize }}
               onClick={(e) => {
                 e.stopPropagation();
                 e.preventDefault();
@@ -39,10 +54,10 @@ export default function TimerPill({ time, progress, editable, onEditMinutes, onE
             >
               {minutes}
             </span>
-            <span className="text-white text-5xl md:text-3xl font-medium tracking-tight" style={{ WebkitTextSizeAdjust: 'none', textSizeAdjust: 'none', fontSize: window.innerWidth < 768 ? '3rem' : '1.875rem' }}>:</span>
+            <span className="text-white text-5xl md:text-3xl font-medium tracking-tight" style={{ WebkitTextSizeAdjust: 'none', textSizeAdjust: 'none', fontSize }}>:</span>
             <span 
               className="text-white text-5xl md:text-3xl font-medium tracking-tight cursor-pointer select-none hover:opacity-80 active:scale-95 transition-all"
-              style={{ WebkitTextSizeAdjust: 'none', textSizeAdjust: 'none', fontSize: window.innerWidth < 768 ? '3rem' : '1.875rem' }}
+              style={{ WebkitTextSizeAdjust: 'none', textSizeAdjust: 'none', fontSize }}
               onClick={(e) => {
                 e.stopPropagation();
                 e.preventDefault();
@@ -55,7 +70,7 @@ export default function TimerPill({ time, progress, editable, onEditMinutes, onE
             </span>
           </>
         ) : (
-          <span className="text-white text-5xl md:text-3xl font-medium tracking-tight" style={{ WebkitTextSizeAdjust: 'none', textSizeAdjust: 'none', fontSize: window.innerWidth < 768 ? '3rem' : '1.875rem' }}>
+          <span className="text-white text-5xl md:text-3xl font-medium tracking-tight" style={{ WebkitTextSizeAdjust: 'none', textSizeAdjust: 'none', fontSize }}>
             {time}
           </span>
         )}
