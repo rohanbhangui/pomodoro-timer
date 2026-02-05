@@ -20,6 +20,7 @@ export default function Home() {
   const doneTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const touchStartY = useRef<number | null>(null);
   const mouseStartY = useRef<number | null>(null);
+  const dragStartProgress = useRef<number>(0); // Store progress when drag starts
   const containerRef = useRef<HTMLDivElement>(null);
   const justStartedTimer = useRef(false); // Track if we just started the timer to prevent immediate pause
   const [isMobile, setIsMobile] = useState(false);
@@ -156,6 +157,7 @@ export default function Home() {
     if (timerState === 'initial' || timerState === 'done') {
       e.preventDefault();
       touchStartY.current = e.touches[0].clientY;
+      dragStartProgress.current = swipeProgress; // Store current progress
       if (timerState === 'done') {
         // Reset to initial state when dragging on done screen
         setTimerState('initial');
@@ -183,13 +185,14 @@ export default function Home() {
     
     if (isSwipingUp) {
       const container = containerRef.current;
-      if (!container) return;
+      if (!container || containerHeight === 0) return;
       
-      const rect = container.getBoundingClientRect();
-      const relativeY = currentY - rect.top;
+      const deltaYFromStart = touchStartY.current! - currentY; // Positive when moving up
       
-      // Simple progress calculation from bottom (0) to top (1)
-      let progress = Math.max(0, Math.min(1, 1 - (relativeY / rect.height)));
+      // Convert pixel movement to progress (0-1) based on actual travel distance
+      const progressDelta = deltaYFromStart / containerHeight;
+      let progress = dragStartProgress.current + progressDelta;
+      progress = Math.max(0, Math.min(1, progress));
       
       // Add resistance if timer is at 0:00 - reduce progress dramatically
       if (totalSeconds === 0) {
@@ -247,6 +250,7 @@ export default function Home() {
   const handleMouseDown = (e: React.MouseEvent) => {
     if (timerState === 'initial' || timerState === 'done') {
       mouseStartY.current = e.clientY;
+      dragStartProgress.current = swipeProgress; // Store current progress
       if (timerState === 'done') {
         // Reset to initial state when dragging on done screen
         setTimerState('initial');
@@ -272,13 +276,14 @@ export default function Home() {
     
     if (isSwipingUp) {
       const container = containerRef.current;
-      if (!container) return;
+      if (!container || containerHeight === 0) return;
       
-      const rect = container.getBoundingClientRect();
-      const relativeY = currentY - rect.top;
+      const deltaYFromStart = mouseStartY.current! - currentY; // Positive when moving up
       
-      // Simple progress calculation from bottom (0) to top (1)
-      let progress = Math.max(0, Math.min(1, 1 - (relativeY / rect.height)));
+      // Convert pixel movement to progress (0-1) based on actual travel distance
+      const progressDelta = deltaYFromStart / containerHeight;
+      let progress = dragStartProgress.current + progressDelta;
+      progress = Math.max(0, Math.min(1, progress));
       
       // Add resistance if timer is at 0:00 - reduce progress dramatically
       if (totalSeconds === 0) {
